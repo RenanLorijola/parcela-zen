@@ -110,7 +110,6 @@ export default function InstallmentCalculator() {
 
       <CardContent className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Coluna 1: Valor e Parcelas */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="total">Valor total (R$)</Label>
@@ -132,13 +131,14 @@ export default function InstallmentCalculator() {
                 min={1}
                 max={99}
                 value={installments}
-                onChange={(e) => setInstallments(e.target.value)}
+                onChange={(e) => {
+                  const value = Math.min(99, parseInt(e.target.value) || 0);
+                  setInstallments(value.toString());
+                }}
                 className="text-lg"
               />
             </div>
           </div>
-
-          {/* Coluna 2: Tipo de Investimento e Taxa */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Tipo de investimento</Label>
@@ -210,8 +210,6 @@ export default function InstallmentCalculator() {
             )}
           </div>
         </div>
-
-        {/* Opções Avançadas */}
         <div className="space-y-4 rounded-lg border border-muted-foreground/20 bg-muted/30 p-4">
           <button
             type="button"
@@ -226,7 +224,6 @@ export default function InstallmentCalculator() {
 
           {showAdvanced && (
             <div className="space-y-4 pt-2">
-              {/* Tendência da Selic */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">
                   Cenário de taxa de juros
@@ -268,8 +265,6 @@ export default function InstallmentCalculator() {
                   </label>
                 </div>
               </div>
-
-              {/* Margem de Segurança */}
               <div className="flex items-center justify-between space-x-2 rounded-md border border-primary/20 bg-primary/5 p-3">
                 <div className="space-y-0.5">
                   <Label htmlFor="safety-margin" className="text-sm font-medium">
@@ -306,8 +301,6 @@ export default function InstallmentCalculator() {
             </span>
           </div>
         </div>
-
-        {/* Gráfico de evolução */}
         {chartData.length > 0 && (
           <div className="space-y-3 rounded-lg border-2 border-primary/20 bg-card p-6">
             <h3 className="text-lg font-semibold text-foreground">
