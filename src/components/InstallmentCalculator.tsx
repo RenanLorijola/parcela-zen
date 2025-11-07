@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import presentValueOfInstallments from "../lib/calc";
+import presentValueOfInstallments, { generateChartData } from "../lib/calc";
 import {
   Card,
   CardContent,
@@ -14,6 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSelicRate } from "@/hooks/useSelicRate";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -25,6 +35,7 @@ export default function InstallmentCalculator() {
   const [total, setTotal] = React.useState<string>("");
   const [installments, setInstallments] = React.useState<string>("6");
   const [annualRate, setAnnualRate] = React.useState<string>("");
+  const [investmentType, setInvestmentType] = React.useState<'selic' | 'cdb' | 'lci-lca'>('selic');
   
   // Opções avançadas
   const [showAdvanced, setShowAdvanced] = React.useState(false);
@@ -34,13 +45,30 @@ export default function InstallmentCalculator() {
   // Atualiza a taxa quando a Selic for carregada
   React.useEffect(() => {
     if (selicRate !== null && annualRate === "") {
-      setAnnualRate(selicRate.toFixed(2));
+      if (investmentType === 'selic') {
+        setAnnualRate(selicRate.toFixed(2));
+      } else {
+        setAnnualRate("100");
+      }
     }
-  }, [selicRate, annualRate]);
+  }, [selicRate, annualRate, investmentType]);
 
   const totalNum = parseFloat(total.replace(",", ".")) || 0;
   const installmentsNum = Math.max(1, parseInt(installments) || 0);
-  const annualRateNum = (parseFloat(annualRate.replace(",", ".")) || 0) / 100;
+  
+  // Calcula a taxa efetiva baseado no tipo de investimento
+  let effectiveRate = parseFloat(annualRate.replace(",", ".")) || 0;
+  if (investmentType === 'selic') {
+    // SELIC: usa taxa absoluta
+    effectiveRate = effectiveRate;
+  } else if (investmentType === 'cdb' || investmentType === 'lci-lca') {
+    // CDB/LCI-LCA: calcula baseado em % do CDI
+    if (selicRate !== null) {
+      const cdiRate = selicRate - 0.1;
+      effectiveRate = (cdiRate * effectiveRate) / 100;
+    }
+  }
+  const annualRateNum = effectiveRate / 100;
 
   const pv = presentValueOfInstallments({
     total: totalNum,
@@ -48,7 +76,22 @@ export default function InstallmentCalculator() {
     annualRate: annualRateNum,
     selicTrend,
     safetyMargin,
+    exemptIR: investmentType === 'lci-lca',
   });
+
+  // Gera dados do gráfico
+  const chartData = React.useMemo(() => {
+    if (totalNum > 0 && installmentsNum > 0 && annualRateNum > 0) {
+      return generateChartData({
+        total: totalNum,
+        installments: installmentsNum,
+        annualRate: annualRateNum,
+        selicTrend,
+        exemptIR: investmentType === 'lci-lca',
+      });
+    }
+    return [];
+  }, [totalNum, installmentsNum, annualRateNum, selicTrend, investmentType]);
 
   const installmentValue =
     installmentsNum > 0 ? totalNum / installmentsNum : 0;
@@ -66,48 +109,100 @@ export default function InstallmentCalculator() {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-6 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="total">Valor total (R$)</Label>
-            <Input
-              id="total"
-              inputMode="decimal"
-              value={total}
-              onChange={(e) => setTotal(e.target.value)}
-              placeholder="10.000"
-              className="text-lg"
-            />
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Coluna 1: Valor e Parcelas */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="total">Valor total (R$)</Label>
+              <Input
+                id="total"
+                inputMode="decimal"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                placeholder="10.000"
+                className="text-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="installments">Número de parcelas</Label>
+              <Input
+                id="installments"
+                type="number"
+                min={1}
+                max={99}
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+                className="text-lg"
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="installments">Número de parcelas</Label>
-            <Input
-              id="installments"
-              type="number"
-              min={1}
-              value={installments}
-              onChange={(e) => setInstallments(e.target.value)}
-              className="text-lg"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rate">
-              Rendimento anual (%)
-              {loadingSelic && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  carregando...
-                </span>
+          {/* Coluna 2: Tipo de Investimento e Taxa */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tipo de investimento</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInvestmentType('selic')}
+                  className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer text-sm ${
+                    investmentType === 'selic'
+                      ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E] font-medium'
+                      : 'border-border hover:border-[#22C55E]/50'
+                  }`}
+                >
+                  SELIC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvestmentType('cdb')}
+                  className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer text-sm ${
+                    investmentType === 'cdb'
+                      ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E] font-medium'
+                      : 'border-border hover:border-[#22C55E]/50'
+                  }`}
+                >
+                  CDB
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvestmentType('lci-lca')}
+                  className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer text-sm ${
+                    investmentType === 'lci-lca'
+                      ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E] font-medium'
+                      : 'border-border hover:border-[#22C55E]/50'
+                  }`}
+                >
+                  LCI/LCA
+                </button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="rate">
+                {investmentType === 'selic' ? 'Rendimento anual (%)' : 'Percentual do CDI (%)'}
+                {loadingSelic && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    carregando...
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="rate"
+                inputMode="decimal"
+                value={annualRate}
+                onChange={(e) => setAnnualRate(e.target.value)}
+                placeholder={investmentType === 'selic' ? '11.75' : '100'}
+                className="text-lg"
+              />
+              {(investmentType === 'cdb' || investmentType === 'lci-lca') && selicRate !== null && annualRate && (
+                <p className="text-sm text-muted-foreground">
+                  {annualRate}% do CDI = {effectiveRate.toFixed(2)}% a.a.
+                  <span className="ml-1 text-xs">(CDI = Selic - 0,1% = {(selicRate - 0.1).toFixed(2)}%)</span>
+                </p>
               )}
-            </Label>
-            <Input
-              id="rate"
-              inputMode="decimal"
-              value={annualRate}
-              onChange={(e) => setAnnualRate(e.target.value)}
-              placeholder="6"
-              className="text-lg"
-            />
+            </div>
             {selicRate !== null && (
               <p className="text-xs text-gray-500 font-medium">
                 Selic atual: {selicRate.toFixed(2)}% a.a.
@@ -178,10 +273,10 @@ export default function InstallmentCalculator() {
               <div className="flex items-center justify-between space-x-2 rounded-md border border-primary/20 bg-primary/5 p-3">
                 <div className="space-y-0.5">
                   <Label htmlFor="safety-margin" className="text-sm font-medium">
-                    🛡️ Margem de segurança (+5%)
+                    🛡️ Margem de segurança (-5%)
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Guarda 5% a mais para quedas inesperadas na taxa
+                    Reduz a taxa de rendimento em 5% para calcular com segurança
                   </p>
                 </div>
                 <Switch
@@ -211,18 +306,84 @@ export default function InstallmentCalculator() {
             </span>
           </div>
         </div>
+
+        {/* Gráfico de evolução */}
+        {chartData.length > 0 && (
+          <div className="space-y-3 rounded-lg border-2 border-primary/20 bg-card p-6">
+            <h3 className="text-lg font-semibold text-foreground">
+              📊 Evolução do seu investimento
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Veja como seu dinheiro rende e é usado para pagar as parcelas ao longo do tempo
+            </p>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="month"
+                    label={{ value: "Meses", position: "insideBottom", offset: -5 }}
+                    stroke="#6b7280"
+                  />
+                  <YAxis
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                    stroke="#6b7280"
+                  />
+                  <Tooltip
+                    formatter={(value: number) => currency.format(value)}
+                    labelFormatter={(label) => `Mês ${label}`}
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.95)",
+                      border: "1px solid #22C55E",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="balance"
+                    stroke="#22C55E"
+                    strokeWidth={2}
+                    name="Saldo disponível"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="withdrawn"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    name="Total pago em parcelas"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-3 rounded-full bg-[#22C55E]"></div>
+                <span>Saldo: dinheiro que ainda está investido</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-3 rounded-full bg-[#ef4444]"></div>
+                <span>Pago: total já usado para pagar parcelas</span>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="flex-col items-start gap-2">
         <p className="text-sm text-muted-foreground">
-          Este cálculo considera parcelas mensais começando no segundo mês (evitando IOF),
-          rendimento com capitalização mensal e Imposto de Renda regressivo sobre os ganhos.
+          Este cálculo considera parcelas mensais começando somente no segundo mês.
         </p>
         {(selicTrend !== 'stable' || safetyMargin) && (
           <p className="text-xs text-primary font-medium">
             {selicTrend === 'falling' && '📉 Considerando queda gradual da taxa de juros. '}
             {selicTrend === 'rising' && '📈 Considerando aumento gradual da taxa de juros. '}
-            {safetyMargin && '🛡️ Margem de segurança de 5% ativada.'}
+            {safetyMargin && '🛡️ Taxa de rendimento reduzida em 5% para margem de segurança.'}
           </p>
         )}
       </CardFooter>
