@@ -1,0 +1,17 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Green rounded background -->
+  <rect x="16" y="16" width="224" height="224" rx="40" fill="#22C55E"/>
+
+  <!-- Card body -->
+  <rect x="48" y="80" width="160" height="96" rx="14" fill="#FFFFFF"/>
+
+  <!-- Top stripe -->
+  <rect x="56" y="92" width="144" height="16" rx="4" fill="#22C55E"/>
+
+  <!-- Name/line -->
+  <rect x="56" y="124" width="72" height="10" rx="3" fill="#22C55E"/>
+
+  <!-- Circles (simulating chip/brand) -->
+  <circle cx="166" cy="146" r="10" fill="#22C55E"/>
+  <circle cx="184" cy="146" r="10" fill="#16A34A" opacity="0.9"/>
+</svg>
