@@ -196,18 +196,7 @@ export default function InstallmentCalculator() {
                 placeholder={investmentType === 'selic' ? '11.75' : '100'}
                 className="text-lg"
               />
-              {(investmentType === 'cdb' || investmentType === 'lci-lca') && selicRate !== null && annualRate && (
-                <p className="text-sm text-muted-foreground">
-                  {annualRate}% do CDI = {effectiveRate.toFixed(2)}% a.a.
-                  <span className="ml-1 text-xs">(CDI = Selic - 0,1% = {(selicRate - 0.1).toFixed(2)}%)</span>
-                </p>
-              )}
             </div>
-            {selicRate !== null && (
-              <p className="text-xs text-gray-500 font-medium">
-                Selic atual: {selicRate.toFixed(2)}% a.a.
-              </p>
-            )}
           </div>
         </div>
         <div className="space-y-4 rounded-lg border border-muted-foreground/20 bg-muted/30 p-4">
